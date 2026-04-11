@@ -1,0 +1,23 @@
+# Fiber Optic Cable (ITU-T G.652)
+fiber:
+  length_m: 100.0
+  gamma: 1.1
+  beta2: -21.0e-27
+  spatial_resolution: 0.01
+
+# Transmission Source
+transmitter:
+  wavelength_nm: 1550
+  repetition_rate_ghz: 100
+  power_mw: 5.0
+
+# DSP & OBR
+security:
+  stability_threshold: 0.85
+  feedback_latency_ms: 2.0
+  noise_seed: 42
+
+# Attacker Scenario
+attacker:
+  tap_enabled: true
+  siphon_percentage: 0.03
