@@ -13,8 +13,7 @@ fiber:
   
   # Nonlinearity
   n_linear_idx: 1.46
-  n2_nonlinear_m2_w: 2.6e-20
-  gamma: 1.1               
+  n2_nonlinear_m2_w: 2.6e-20            
 
   # Physical Disturbance
   bend_radius_mm: 30.0

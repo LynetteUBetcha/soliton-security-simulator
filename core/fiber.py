@@ -1,5 +1,11 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 import numpy as np
 from scipy.fft import fft, ifft, fftfreq
+from utils import physics_utils as phys
+
+if TYPE_CHECKING:
+    from core.signal_model import Signal
 
 class Fiber():
     """
@@ -41,17 +47,15 @@ class Fiber():
         # Beta3
         self.beta3 = ((self.center_lambda_m / (2 * np.pi * self.c))**2 * (self.center_lambda_m**2 * S_0_max * 1e-3 + 2 * self.center_lambda_m * self.D * 1e-6))     
 
-    def propagate_signal(self, signal, num_steps):
+    def propagate_signal(self, signal: Signal, num_steps):
         """
         Uses the Split-Step Fourier Method to propagate the signal, yielding after every step.
         """
         dz = self.length_m / num_steps
 
         # Calculate angular frequency
-        A = signal.complex_amplitude
+        A = signal.complex_amplitude_x
         omega = 2 * np.pi * fftfreq(len(A), d=signal.time_step)
-
-
 
         for step in range(num_steps):
             current_distance_m = step * dz
@@ -68,15 +72,15 @@ class Fiber():
             A = ifft(A_f)
 
             # Update signal with new pulse condition
-            signal.complex_amplitude = A
+            signal.complex_amplitude_x = A
             yield signal, current_distance_m
     
-    def calculate_stability(self, signal):
+    def calculate_stability(self, signal: Signal):
         """
         Calculates current soliton order (N).
         """
         # Peak power in Watts
-        P0 = np.max(np.abs(signal.complex_amplitude)**2)
+        P0 = signal.get_total_peak_power()
 
         # Pulse width
         T0 = signal.get_current_width()
@@ -91,13 +95,10 @@ class Fiber():
         Converts dB loss to Nepers/meter.
         """
 
-        # Conversion variable
-        db_to_np = 10 * np.log10(np.exp(1))
-
         # If bend is very sharp, induce a larger loss
         if bend_radius_mm < 15:
-            added_loss_np = (self.macro_bend_loss_db * 5) / db_to_np
+            added_loss_np = phys.db_to_neper_power(self.macro_bend_loss_db * 5)
         else:
-            added_loss_np = self.macro_bend_loss_db / db_to_np
+            added_loss_np = phys.db_to_neper_power(self.macro_bend_loss_db)
 
         self.alpha_np_m += added_loss_np
