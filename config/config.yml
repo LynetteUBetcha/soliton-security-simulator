@@ -25,6 +25,9 @@ transmitter:
   repetition_rate_ghz: 100
   power_mw: 5.0
 
+receiver:
+  base_power_mw: 0.010
+
 # DSP & OBR
 security:
   stability_threshold: 0.85

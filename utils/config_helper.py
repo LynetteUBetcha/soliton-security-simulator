@@ -41,6 +41,6 @@ class ConfigHelper():
         self.siphon_percentage = config['attacker']['siphon_percentage']
 
         # Reciever
-        self.receiver_power_mw = config['reciever']['base_power_mw']
+        self.receiver_power_mw = config['receiver']['base_power_mw']
 
 
