@@ -2,36 +2,61 @@ import numpy as np
 
 class Signal():
     """
-    Represent the solitons traveling through fiber.
+    Represents a dual-polarization QPSK modulated optical pulse train.
     """
-
-    def __init__(self, num_samples, time_window_ps, peak_power_w, pulse_width_ps):
-       
+    def __init__(self, num_samples, time_window_ps, peak_power_w, pulse_width_ps, symbols_x, symbols_y):
         self.num_samples = num_samples
-        
-        # Convert picoseconds to SI base units (seconds)
         self.time_window_s = time_window_ps * 1e-12
         self.T0_s = pulse_width_ps * 1e-12
         self.P0_w = peak_power_w
         
-        # Create time array centered at t=0
+        # Store ideal data for EVM calculations
+        self.ideal_symbols_x = np.array(symbols_x)
+        self.ideal_symbols_y = np.array(symbols_y)
+        
+        # Ensure the amount of data on both axes is the same
+        if len(self.ideal_symbols_x) != len(self.ideal_symbols_y):
+            raise ValueError("X and Y symbol arrays must be the same length.")
+        self.num_symbols = len(self.ideal_symbols_x)
+        
+        # Create the time grid
         self.time_array = np.linspace(-self.time_window_s/2, self.time_window_s/2, num_samples)
         self.time_step = self.time_window_s / num_samples
         
-        # Initialize X and Y polarization states
-        self.complex_amplitude_x, self.complex_amplitude_y = self._generate_dp_soliton()
+        # Generate the dual-polarization modulated data stream
+        self.complex_amplitude_x, self.complex_amplitude_y = self._generate_dp_pulse_train()
 
-    def _generate_dp_soliton(self):
+    def _generate_dp_pulse_train(self):
         """
-        Creates the fundamental soliton shape and splits the power across X and Y axes.
+        Generates a sequence of solitons across both X and Y polarizations.
+        Splits total peak power equally between the two axes.
         """
-        # Half power to the X polarization
-        amplitude_x = np.sqrt(self.P0_w / 2) * (1.0 / np.cosh(self.time_array / self.T0_s))
+        total_signal_x = np.zeros(self.num_samples, dtype=complex)
+        total_signal_y = np.zeros(self.num_samples, dtype=complex)
         
-        # Half power to the Y polarization
-        amplitude_y = np.sqrt(self.P0_w / 2) * (1.0 / np.cosh(self.time_array / self.T0_s))
+        # Bit Period calculation to space the pulses evenly
+        bit_period_s = self.time_window_s / (self.num_symbols + 1)
+        start_time = -self.time_window_s/2 + bit_period_s
         
-        return amplitude_x.astype(complex), amplitude_y.astype(complex)
+        axis_power = self.P0_w / 2
+        
+        for i in range(self.num_symbols):
+            pulse_center_t = start_time + (i * bit_period_s)
+            
+            # The physical sech envelope (same for both axes)
+            envelope = np.sqrt(axis_power) * (1.0 / np.cosh((self.time_array - pulse_center_t) / self.T0_s))
+            
+            # X-Axis Modulation
+            sym_x = self.ideal_symbols_x[i]
+            mod_x = envelope * (sym_x / np.abs(sym_x))
+            total_signal_x += mod_x
+            
+            # Y-Axis Modulation
+            sym_y = self.ideal_symbols_y[i]
+            mod_y = envelope * (sym_y / np.abs(sym_y))
+            total_signal_y += mod_y
+            
+        return total_signal_x, total_signal_y
 
     def get_current_width(self):
         """
