@@ -1,9 +1,11 @@
-import numpy as np
 from __future__ import annotations
+import numpy as np
 from typing import TYPE_CHECKING
+from utils.config_helper import ConfigHelper
 
 if TYPE_CHECKING:
     from utils.config_helper import ConfigHelper
+    from core.signal_model import Signal
 
 class Receiver():
     def __init__(self):
@@ -39,6 +41,36 @@ class Receiver():
             "wavelength_nm": tuned_wavelength_nm
         }
     
+    def extract_symbols(self, signal: Signal):
+        """
+        Acts as the analog-to-digital sampler. 
+        Slices the continuous waveform at the center of each bit period to extract the symbols.
+        """
+        num_symbols = len(signal.ideal_symbols_x)
+        received_symbols_x = []
+        received_symbols_y = []
+        
+        # Recreate the timing grid used by the Transmitter
+        bit_period_s = signal.time_window_s / (num_symbols + 1)
+        start_time = -signal.time_window_s/2 + bit_period_s
+        
+        for i in range(num_symbols):
+            # Calculate the exact time this specific pulse should peak
+            target_time = start_time + (i * bit_period_s)
+            
+            # Find the index in the time_array that is closest to our target time
+            # np.abs() finds the distance, np.argmin() finds the index of the smallest distance
+            closest_index = np.argmin(np.abs(signal.time_array - target_time))
+            
+            # Extract the complex amplitude at that exact index
+            sampled_x = signal.complex_amplitude_x[closest_index]
+            sampled_y = signal.complex_amplitude_y[closest_index]
+            
+            received_symbols_x.append(sampled_x)
+            received_symbols_y.append(sampled_y)
+            
+        return received_symbols_x, received_symbols_y
+
     def read_optical_payload(self, symbols_x, symbols_y):
         """
         Takes the received QPSK symbols, demaps them to binary,

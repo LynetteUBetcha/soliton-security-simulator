@@ -80,7 +80,7 @@ class Fiber():
 
         # Pre-calculate the Control Beam Profile and Walk-Off Penalty
         if control_beam is not None:
-            control_profile = self.calculate_control_beam_profile(control_beam["tuned_power_w"], num_steps)
+            control_profile = self.calculate_control_beam_profile(control_beam["power_w"], num_steps)
             delta_lambda_nm = abs(self.center_wavelength_nm - control_beam["wavelength_nm"])
             
             # The walk-off penalty reduces interference if wavelengths are too far apart

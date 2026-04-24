@@ -1,15 +1,31 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 from core.signal_model import Signal
 import math
+import numpy as np
+
+if TYPE_CHECKING:
+    from core.fiber import Fiber
 
 class Transmitter():
     def __init__(self, laser_power_w, pulse_width_ps):
         self.P0 = laser_power_w
         self.T0 = pulse_width_ps
 
-    def generate_optical_payload(self, string_message):
+    def generate_optical_payload(self, string_message, control_beam_power_at_tx, fiber: Fiber):
         """
         Takes a string, converts to binary, maps to DP-QPSK, and generates the Signal.
         """
+
+        # 1. What power does the fiber physics demand for a perfect soliton?
+        required_total_power = np.abs(fiber.beta2) / (fiber.gamma * (self.T0 * 1e-12)**2)
+        
+        # 2. Subtract the interference provided by the control beam (XPM)
+        # We subtract 2x the control beam power due to the XPM multiplier
+        deficit_p0 = required_total_power - (2 * control_beam_power_at_tx)
+        
+        self.P0 = max(deficit_p0, 0.001) # Prevent negative power
+
         # String to Binary
         bits = self._string_to_bits(string_message)
         

@@ -1,8 +1,11 @@
 import yaml
+from pathlib import Path
+
+config_path = Path(__file__).parent.parent / "config/config.yml"
 
 class ConfigHelper():
 
-    def __init__(self, config_path = "config.yml"):
+    def __init__(self, config_path = config_path):
         with open(config_path, "r") as file:
             config = yaml.safe_load(file)
 
@@ -30,6 +33,7 @@ class ConfigHelper():
         self.tx_wavelength_nm = config['transmitter']['wavelength_nm']
         self.tx_repetition_rate_ghz = config['transmitter']['repetition_rate_ghz']
         self.tx_power_mw = config['transmitter']['power_mw']
+        self.pulse_width_ps = config['transmitter']['pulse_width_ps']
 
         # --- DSP & Security Parameters ---
         self.stability_threshold = config['security']['stability_threshold']
