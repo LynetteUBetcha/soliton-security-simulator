@@ -93,12 +93,25 @@ class Fiber():
         for step in range(num_steps):
             current_distance_m = step * dz
 
-            # Linear operator calculated every loop for dynamic events (i.e., tap occurs)
-            linear_operator = np.exp( (-self.alpha_np_m/2 - 1j*(self.beta2/2)*omega**2 - 1j*(self.beta3/6)*omega**3) * dz )
+            if control_beam is not None:
+                # DISTRIBUTED RAMAN AMPLIFICATION (DRA)
+                # Calculate how much power the control beam has lost to the attacker's tap
+                distance_to_rx = self.length_m - current_distance_m
+                healthy_baseline_power = control_beam["power_w"] * np.exp(-self.alpha_np_m * distance_to_rx)
+                survival_ratio = control_profile[step] / healthy_baseline_power
+                
+                # Apply the Symbiotic Gain to counter natural attenuation
+                effective_alpha = self.alpha_np_m * (1.0 - survival_ratio)
+                
+                # CROSS-PHASE MODULATION (XPM)
+                # Apply the walk-off penalty to calculate the effective interference power
+                P_control = control_profile[step] * coupling_efficiency
+            else:
+                effective_alpha = self.alpha_np_m
+                P_control = 0.0
 
-            # XPM interference calculation
-            # Apply the walk-off penalty to the control beam's power at this exact distance
-            P_control = control_profile[step] * coupling_efficiency
+            # Linear operator calculated every loop for dynamic events (i.e., tap occurs)
+            linear_operator = np.exp( (-effective_alpha/2 - 1j*(self.beta2/2)*omega**2 - 1j*(self.beta3/6)*omega**3) * dz )
 
             # Nonlinear step (time domain)
             # The pulse is squeezed by its combined power (SPM) plus the Control Beam (XPM)

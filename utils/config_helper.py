@@ -31,7 +31,7 @@ class ConfigHelper():
 
         # --- Transmitter Parameters ---
         self.tx_wavelength_nm = config['transmitter']['wavelength_nm']
-        self.tx_repetition_rate_ghz = config['transmitter']['repetition_rate_ghz']
+        self.tx_repetition_rate_ps = config['transmitter']['repetition_rate_ps']
         self.tx_power_mw = config['transmitter']['power_mw']
         self.pulse_width_ps = config['transmitter']['pulse_width_ps']
 

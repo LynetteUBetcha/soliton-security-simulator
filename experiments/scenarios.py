@@ -38,7 +38,8 @@ class Scenario():
         rx = Receiver()
         tx = Transmitter(
             laser_power_w=config.tx_power_mw,
-            pulse_width_ps=config.pulse_width_ps
+            pulse_width_ps=config.pulse_width_ps,
+            repition_rate_ps=config.tx_repetition_rate_ps
         )
         attacker = Attacker(siphon_percentage=config.siphon_percentage)
 
@@ -64,7 +65,7 @@ class Scenario():
         
         # Tx measures the beam arriving at z=0 and sets the exact deficit P0
         power_arriving_at_tx = baseline_control_profile[0]
-        signal = tx.generate_optical_payload(secret_message, power_arriving_at_tx, fiber)
+        signal = tx.generate_optical_payload(secret_message, control_beam, fiber)
         print(f"[TX] Payload Generated. Target string: {secret_message}")
 
         # --- PHASE 2: PRE-ATTACK PROPAGATION ---
@@ -117,7 +118,9 @@ class Scenario():
             for current_signal, dist_m in generator:
                 current_distance = dist_m / 1000.0
                 if int(current_distance) % 10 == 0 and int(current_distance) != 0:
-                    print(f"[{current_distance:.1f} km] Signal stable. Symbiotic lock holding.")
+                            rx_symbols_x, rx_symbols_y = rx.extract_symbols(current_signal)
+                            final_string = rx.read_optical_payload(rx_symbols_x, rx_symbols_y)
+                            print(f"Current string at {current_distance}: {final_string}")
 
         # --- PHASE 5: LEGITIMATE RECEIVER READOUT ---
         print("\n--- PHASE 5: LINK TERMINATION ---")
