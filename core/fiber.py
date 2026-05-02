@@ -159,8 +159,11 @@ class Fiber():
 
         # If bend is very sharp, induce a larger loss
         if bend_radius_mm < 15:
-            added_loss_np = phys.db_to_neper_power(self.macro_bend_loss_db * 5)
+            added_loss_np_km = phys.db_to_neper_power(self.macro_bend_loss_db * 5)
         else:
-            added_loss_np = phys.db_to_neper_power(self.macro_bend_loss_db)
+            added_loss_np_km = phys.db_to_neper_power(self.macro_bend_loss_db)
 
-        self.alpha_np_m += added_loss_np
+        # km to m
+        added_loss_np_m = added_loss_np_km / 1000.0
+
+        self.alpha_np_m += added_loss_np_m
