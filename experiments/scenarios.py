@@ -84,12 +84,15 @@ class Scenario():
                      print("\n--- FIBER TAP ATTACK ---")
                      attacker.tap_fiber(fiber, bend_radius_mm=config.bend_radius_mm)
 
+                     fiber.update_control_profile(control_beam, total_steps, attack_location_km, config.siphon_percentage)
+
                 # Check for attack
                 if current_distance == attack_location_km:
 
                      # Attacker pulls the light out of the fiber
                      stolen_string = attacker.intercept_payload(current_signal)
                      print(f"ATTACKER Intercepted String: {stolen_string}")
+                     current_signal.apply_siphon_loss(config.siphon_percentage)
 
         else:
             generator = fiber.propagate_signal(signal, total_steps, control_beam)

@@ -88,3 +88,11 @@ class Signal():
         """
         total_power = np.abs(self.complex_amplitude_x)**2 + np.abs(self.complex_amplitude_y)**2
         return np.max(total_power)
+    
+    def apply_siphon_loss(self, siphon_percentage):
+        """
+        Adjusts the amplitudes of the current signal based on siphon percentage
+        """
+        amplitude_retention = np.sqrt(1.0 - siphon_percentage)
+        self.complex_amplitude_x *= amplitude_retention
+        self.complex_amplitude_y *= amplitude_retention

@@ -27,6 +27,10 @@ class Fiber():
         self.n_linear_idx = n_linear_idx
         self.macro_bend_loss_db = macro_bend_loss_db
 
+        # Initialize fiber profile here so it can be dynamically updated later
+        self.control_profile = 0
+        self.coupling_efficiency = 0
+
         # Effective area
         self.A_eff_m2 = np.pi * ((mode_field_diameter_um * 1e-6) / 2)**2
 
@@ -47,7 +51,7 @@ class Fiber():
         # Beta3
         self.beta3 = ((self.center_lambda_m / (2 * np.pi * self.c))**2 * (self.center_lambda_m**2 * S_0_max * 1e-3 + 2 * self.center_lambda_m * self.D * 1e-6))     
 
-    def calculate_control_beam_profile(self, rx_power_w, num_steps):
+    def calculate_control_beam_profile(self, rx_power_w, num_steps, tap_location_km=None, siphon_percentage=0.0):
             """
             Calculates the backward-propagating control beam power profile.
             The beam starts at the Receiver (end of the array) and attenuates as it travels backward to the Tx.
@@ -56,11 +60,15 @@ class Fiber():
             control_profile = np.zeros(num_steps)
             
             for step in range(num_steps):
+                z_m = step * dz
                 # Calculate distance from the Receiver
-                distance_from_rx = self.length_m - (step * dz)
+                distance_from_rx = self.length_m - z_m
                 
                 # Attenuate the Rx power based on distance traveled
                 control_profile[step] = rx_power_w * np.exp(-self.alpha_np_m * distance_from_rx)
+
+                if tap_location_km is not None and (z_m / 1000.0) <= tap_location_km:
+                    control_profile = control_profile * (1.0 - siphon_percentage)
                 
             return control_profile
 
@@ -79,16 +87,7 @@ class Fiber():
         omega = 2 * np.pi * fftfreq(signal.num_samples, d=signal.time_step)
 
         # Pre-calculate the Control Beam Profile and Walk-Off Penalty
-        if control_beam is not None:
-            control_profile = self.calculate_control_beam_profile(control_beam["power_w"], num_steps)
-            delta_lambda_nm = abs(self.center_wavelength_nm - control_beam["wavelength_nm"])
-            
-            # The walk-off penalty reduces interference if wavelengths are too far apart
-            coupling_efficiency = np.exp(-(delta_lambda_nm / 5.0)**2)
-        else:
-            # Fallback for baseline testing without the lock
-            control_profile = np.zeros(num_steps)
-            coupling_efficiency = 0.0
+        self.update_control_profile(control_beam, num_steps)
 
         for step in range(num_steps):
             current_distance_m = step * dz
@@ -98,14 +97,14 @@ class Fiber():
                 # Calculate how much power the control beam has lost to the attacker's tap
                 distance_to_rx = self.length_m - current_distance_m
                 healthy_baseline_power = control_beam["power_w"] * np.exp(-self.alpha_np_m * distance_to_rx)
-                survival_ratio = control_profile[step] / healthy_baseline_power
+                survival_ratio = self.control_profile[step] / healthy_baseline_power
                 
                 # Apply the Symbiotic Gain to counter natural attenuation
                 effective_alpha = self.alpha_np_m * (1.0 - survival_ratio)
                 
                 # CROSS-PHASE MODULATION (XPM)
                 # Apply the walk-off penalty to calculate the effective interference power
-                P_control = control_profile[step] * coupling_efficiency
+                P_control = self.control_profile[step] * self.coupling_efficiency
             else:
                 effective_alpha = self.alpha_np_m
                 P_control = 0.0
@@ -167,3 +166,14 @@ class Fiber():
         added_loss_np_m = added_loss_np_km / 1000.0
 
         self.alpha_np_m += added_loss_np_m
+
+    def update_control_profile(self, control_beam, num_steps, tap_location_km=None, siphon_percentage=0.0):
+        """
+        Calculates and stores the control profile as an object attribute.
+        Can be called mid-flight by main.py to simulate dynamic environmental changes.
+        """
+        self.control_profile = self.calculate_control_beam_profile(control_beam["power_w"], num_steps,  tap_location_km, siphon_percentage)
+        
+        delta_lambda_nm = abs(self.center_wavelength_nm - control_beam["wavelength_nm"])
+        self.coupling_efficiency = np.exp(-(delta_lambda_nm / 5.0)**2)
+
