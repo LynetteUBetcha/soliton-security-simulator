@@ -26,7 +26,7 @@ transmitter:
   wavelength_nm: 1550
   repetition_rate_ps: 100
   power_mw: 5.0
-  pulse_width_ps: 18.0
+  pulse_width_ps: 35.0
 
 receiver:
   base_power_mw: 0.002
