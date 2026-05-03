@@ -192,19 +192,37 @@ class Fiber():
         dz = self.length_m / num_steps
         control_profile = np.zeros(num_steps)
         self.xpm_efficiency_profile = np.full(num_steps, 2.0) # profile starts with full, clean parallel polarization
-        
+        p_forward = rx_power_w / 2.0
+        p_backward = rx_power_w / 2.0
+
+        tap_survival = 1.0 - siphon_percentage
+
         for step in range(num_steps):
             z_m = step * dz
             # Calculate distance from the Receiver
             distance_from_rx = self.length_m - z_m
             
             # Attenuate the Rx power based on distance traveled
-            control_profile[step] = rx_power_w * np.exp(-self.alpha_np_m * distance_from_rx)
+            #control_profile[step] = rx_power_w * np.exp(-self.alpha_np_m * distance_from_rx)
+            # Forward pump decays from Z=0
+            forward_power = p_forward * np.exp(-self.baseline_alpha_np_m * z_m)
+
+            if tap_location_km and z_m >= (tap_location_km / 1000):
+                forward_power *= tap_survival
+            
+            # Backward pump decays from Z=L
+            backward_power = p_backward * np.exp(-self.baseline_alpha_np_m * distance_from_rx)
+
+            if tap_location_km and z_m <= (tap_location_km / 1000):
+                backward_power *= tap_survival
+            
+            # Total symbiotic support at this exact coordinate
+            control_profile[step] = forward_power + backward_power
 
             # Update the XPM profile with random noise from tap location forward to transmitter
-            if tap_location_km is not None and (z_m / 1000.0) <= tap_location_km:
-                control_profile[step] = control_profile[step] * (1.0 - siphon_percentage)
-                self.xpm_efficiency_profile[step] = np.random.uniform(0.67, 2.0)
+            # if tap_location_km is not None and (z_m / 1000.0) <= tap_location_km:
+            #     control_profile[step] = control_profile[step] * (1.0 - siphon_percentage)
+            #     self.xpm_efficiency_profile[step] = np.random.uniform(0.67, 2.0)
             
         return control_profile
 

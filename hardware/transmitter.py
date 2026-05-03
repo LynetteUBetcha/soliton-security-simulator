@@ -37,7 +37,8 @@ class Transmitter():
         # Apply deficit based on the true effective XPM
         deficit_p0 = required_total_power - (2 * effective_control_power)
         # Total power required must not be less than 1 mw
-        self.P0 = max(deficit_p0, 0.001) - 0.00000005
+        #self.P0 = max(deficit_p0, 0.001)
+        self.P0 = 0.02
 
         # String to Binary
         bits = self._string_to_bits(string_message)
