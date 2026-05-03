@@ -2,6 +2,7 @@ from __future__ import annotations
 import numpy as np
 from typing import TYPE_CHECKING
 from utils.config_helper import ConfigHelper
+import utils.physics_utils as phys
 
 if TYPE_CHECKING:
     from utils.config_helper import ConfigHelper
@@ -49,17 +50,28 @@ class Receiver():
         num_symbols = len(signal.ideal_symbols_x)
         received_symbols_x = []
         received_symbols_y = []
-        
+        noise_floor_w = 1e-6
+
         # Recreate the timing grid used by the Transmitter
         bit_period_s = signal.time_window_s / (num_symbols + 1)
-        start_time = -signal.time_window_s/2 + bit_period_s
+        start_time = -signal.time_window_s/2 + bit_period_s        
         
         for i in range(num_symbols):
             target_time = start_time + (i * bit_period_s)
             closest_index = np.argmin(np.abs(signal.time_array - target_time))
             
-            received_symbols_x.append(signal.complex_amplitude_x[closest_index])
-            received_symbols_y.append(signal.complex_amplitude_y[closest_index])
+            sample_x = signal.complex_amplitude_x[closest_index]
+            sample_y = signal.complex_amplitude_y[closest_index]
+            
+            # If the pulse has dispersed/starved below the noise floor, it ceases to exist.
+            # The photodiode just reads random ambient static.
+            if np.abs(sample_x)**2 < noise_floor_w:
+                sample_x = (np.random.randn() + 1j * np.random.randn()) * np.sqrt(noise_floor_w)
+            if np.abs(sample_y)**2 < noise_floor_w:
+                sample_y = (np.random.randn() + 1j * np.random.randn()) * np.sqrt(noise_floor_w)
+
+            received_symbols_x.append(sample_x)
+            received_symbols_y.append(sample_y)
             
         # Convert to numpy arrays for vector math
         rx_x = np.array(received_symbols_x)

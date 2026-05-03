@@ -28,8 +28,9 @@ class Fiber():
         self.macro_bend_loss_db = macro_bend_loss_db
 
         # Initialize fiber profile here so it can be dynamically updated later
-        self.control_profile = 0
-        self.coupling_efficiency = 0
+        self.control_profile = None
+        self.coupling_efficiency = 0.0
+        self.xpm_efficiency_profile = None
 
         # Effective area
         self.A_eff_m2 = np.pi * ((mode_field_diameter_um * 1e-6) / 2)**2
@@ -39,6 +40,7 @@ class Fiber():
 
         # Alpha/loss
         self.alpha_np_m = (attenuation_db_km / (10 * np.log10(np.exp(1)))) / 1000
+        self.baseline_alpha_np_m = self.alpha_np_m
 
         # Chromatic dispersion
         l0 = lambda_0_max_nm
@@ -58,6 +60,7 @@ class Fiber():
             """
             dz = self.length_m / num_steps
             control_profile = np.zeros(num_steps)
+            self.xpm_efficiency_profile = np.full(num_steps, 2.0) # profile starts with full parallel polarization
             
             for step in range(num_steps):
                 z_m = step * dz
@@ -68,7 +71,8 @@ class Fiber():
                 control_profile[step] = rx_power_w * np.exp(-self.alpha_np_m * distance_from_rx)
 
                 if tap_location_km is not None and (z_m / 1000.0) <= tap_location_km:
-                    control_profile = control_profile * (1.0 - siphon_percentage)
+                    control_profile[step] = control_profile[step] * (1.0 - siphon_percentage)
+                    self.xpm_efficiency_profile[step] = np.random.uniform(0.67, 2.0)
                 
             return control_profile
 
@@ -96,18 +100,27 @@ class Fiber():
                 # DISTRIBUTED RAMAN AMPLIFICATION (DRA)
                 # Calculate how much power the control beam has lost to the attacker's tap
                 distance_to_rx = self.length_m - current_distance_m
-                healthy_baseline_power = control_beam["power_w"] * np.exp(-self.alpha_np_m * distance_to_rx)
-                survival_ratio = self.control_profile[step] / healthy_baseline_power
+                healthy_baseline_power = control_beam["power_w"] * np.exp(-self.baseline_alpha_np_m * distance_to_rx)
+                survival_ratio = self.control_profile[step] / max(healthy_baseline_power, 1e-20)
                 
                 # Apply the Symbiotic Gain to counter natural attenuation
-                effective_alpha = self.alpha_np_m * (1.0 - survival_ratio)
+                lock_tolerance = 0.99
+                if survival_ratio >= lock_tolerance:
+                    effective_alpha = self.alpha_np_m * (1.0 - survival_ratio)
+                    xpm_multiplier = 2.0
+                else:
+                    effective_alpha = self.alpha_np_m
+                    xpm_multiplier = 0.0
                 
                 # CROSS-PHASE MODULATION (XPM)
                 # Apply the walk-off penalty to calculate the effective interference power
                 P_control = self.control_profile[step] * self.coupling_efficiency
+
+                xpm_multiplier = self.xpm_efficiency_profile[step]
             else:
                 effective_alpha = self.alpha_np_m
                 P_control = 0.0
+                xpm_multiplier = 0
 
             # Linear operator calculated every loop for dynamic events (i.e., tap occurs)
             linear_operator = np.exp( (-effective_alpha/2 - 1j*(self.beta2/2)*omega**2 - 1j*(self.beta3/6)*omega**3) * dz )
@@ -117,11 +130,20 @@ class Fiber():
             total_pulse_power = np.abs(A_x)**2 + np.abs(A_y)**2
             
             # Calculate the shared phase shift
-            nonlinear_phase_shift = np.exp(1j * self.gamma * (total_pulse_power + 2 * P_control) * dz)
+            nonlinear_phase_shift = np.exp(1j * self.gamma * (total_pulse_power + xpm_multiplier * P_control) * dz)
             
             # Apply shift to both polarizations
             A_x = A_x * nonlinear_phase_shift
             A_y = A_y * nonlinear_phase_shift
+
+            if control_beam is not None and survival_ratio < lock_tolerance:
+                # The tumbling control beam randomly rotates the phase of the forward pulse.
+                # Evaluated every step, this creates a chaotic "Random Walk" that destroys QPSK data.
+                phase_jitter_x = np.exp(1j * np.random.uniform(-0.15, 0.15, size=len(A_x))) 
+                phase_jitter_y = np.exp(1j * np.random.uniform(-0.15, 0.15, size=len(A_y))) 
+                
+                A_x = A_x * phase_jitter_x
+                A_y = A_y * phase_jitter_y
 
             # Linear step (frequency domain)
             A_x_f = fft(A_x) * linear_operator
@@ -173,7 +195,7 @@ class Fiber():
         Can be called mid-flight by main.py to simulate dynamic environmental changes.
         """
         self.control_profile = self.calculate_control_beam_profile(control_beam["power_w"], num_steps,  tap_location_km, siphon_percentage)
-        
+
         delta_lambda_nm = abs(self.center_wavelength_nm - control_beam["wavelength_nm"])
         self.coupling_efficiency = np.exp(-(delta_lambda_nm / 5.0)**2)
 

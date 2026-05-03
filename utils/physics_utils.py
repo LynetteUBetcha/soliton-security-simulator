@@ -42,6 +42,17 @@ def add_awgn_noise(complex_amplitude, snr_db):
     
     return complex_amplitude + noise
 
+def add_absolute_noise_floor(self, complex_amplitude, noise_floor_w=1e-6):
+    """
+    Injects a strict, absolute quantum/thermal noise floor.
+    If a pulse disperses and its power drops below this physical floor, 
+    it is permanently lost to ambient static.
+    """
+    # Generate complex ambient static at a fixed physical power level
+    noise = np.sqrt(noise_floor_w / 2) * (np.random.randn() + 1j * np.random.randn())
+    
+    return complex_amplitude + noise
+
 def calculate_evm(received_symbols, ideal_symbols):
     """
     Calculates the Error Vector Magnitude (EVM) as a percentage for a QPSK signal.
