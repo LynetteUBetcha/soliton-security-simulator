@@ -24,7 +24,7 @@ class Transmitter():
         # Calculate the path-averaged control power across the whole fiber
         baseline_profile = fiber.calculate_control_beam_profile(control_beam["power_w"], total_steps)
         average_control_power = np.mean(baseline_profile)
-        
+
         # Calculate the exact Walk-Off Penalty based on the Rx's wavelength shift
         coupling_efficiency = phys.calculate_coupling_efficiency(fiber.center_wavelength_nm, control_beam["wavelength_nm"])
         
