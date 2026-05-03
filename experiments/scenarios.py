@@ -47,7 +47,7 @@ class Scenario():
 
         # 3. Define the Scenario Parameters
         secret_message = "TEST_SECURE_LINK"
-        total_steps = 500  # Number of SSFM slices
+        total_steps = config.total_steps
         step_size_km = config.length_km / total_steps        
 
         attack_location_km = 25.0
@@ -63,7 +63,7 @@ class Scenario():
         
         control_beam = rx.emit_symbiotic_control_beam(physical_seed=physical_seed)             
         
-        signal = tx.generate_optical_payload(secret_message, control_beam, fiber)
+        signal = tx.generate_optical_payload(secret_message, control_beam, total_steps, fiber)
         print(f"[TX] Payload Generated. Target string: {secret_message}")
 
         # --- PHASE 2: PRE-ATTACK PROPAGATION ---

@@ -1,13 +1,16 @@
 import numpy as np
 
+SECONDS_PER_PICOSECOND = 1e-12
+SOLITON_SHAPE_FACTOR = 1.763
+
 class Signal():
     """
     Represents a dual-polarization QPSK modulated optical pulse train.
     """
     def __init__(self, num_samples, time_window_ps, peak_power_w, pulse_width_ps, symbols_x, symbols_y):
         self.num_samples = num_samples
-        self.time_window_s = time_window_ps * 1e-12
-        self.T0_s = pulse_width_ps * 1e-12
+        self.time_window_s = time_window_ps * SECONDS_PER_PICOSECOND
+        self.T0_s = (pulse_width_ps * SECONDS_PER_PICOSECOND) / SOLITON_SHAPE_FACTOR
         self.P0_w = peak_power_w
         
         # Store ideal data for EVM calculations

@@ -182,8 +182,7 @@ class Fiber():
         """
         self.control_profile = self.calculate_control_beam_profile(control_beam["power_w"], num_steps,  tap_location_km, siphon_percentage)
 
-        delta_lambda_nm = abs(self.center_wavelength_nm - control_beam["wavelength_nm"])
-        self.coupling_efficiency = np.exp(-(delta_lambda_nm / 5.0)**2)
+        self.coupling_efficiency = phys.calculate_coupling_efficiency(self.center_wavelength_nm, control_beam["wavelength_nm"])
 
     def calculate_control_beam_profile(self, rx_power_w, num_steps, tap_location_km=None, siphon_percentage=0.0):
         """

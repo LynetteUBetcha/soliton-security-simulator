@@ -1,11 +1,15 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 from core.signal_model import Signal
+import utils.physics_utils as phys
 import math
 import numpy as np
 
 if TYPE_CHECKING:
     from core.fiber import Fiber
+
+SECONDS_PER_PICOSECOND = 1e-12
+SOLITON_SHAPE_FACTOR = 1.763
 
 class Transmitter():
     def __init__(self, laser_power_w, pulse_width_ps, repition_rate_ps):
@@ -13,28 +17,27 @@ class Transmitter():
         self.T0 = pulse_width_ps
         self.repition_rate_ps = repition_rate_ps
 
-    def generate_optical_payload(self, string_message, control_beam, fiber: Fiber):
+    def generate_optical_payload(self, string_message, control_beam, total_steps, fiber: Fiber):
         """
         Takes a string, converts to binary, maps to DP-QPSK, and generates the Signal.
         """
         # Calculate the path-averaged control power across the whole fiber
-        total_steps = 500
         baseline_profile = fiber.calculate_control_beam_profile(control_beam["power_w"], total_steps)
         average_control_power = np.mean(baseline_profile)
         
         # Calculate the exact Walk-Off Penalty based on the Rx's wavelength shift
-        delta_lambda_nm = abs(fiber.center_wavelength_nm - control_beam["wavelength_nm"])
-        coupling_efficiency = np.exp(-(delta_lambda_nm / 5.0)**2)
+        coupling_efficiency = phys.calculate_coupling_efficiency(fiber.center_wavelength_nm, control_beam["wavelength_nm"])
         
         effective_control_power = average_control_power * coupling_efficiency
 
         # Calculate the exact power demand
-        required_total_power = np.abs(fiber.beta2) / (fiber.gamma * (self.T0 * 1e-12)**2)
+        t0_seconds = (self.T0 * SECONDS_PER_PICOSECOND) / SOLITON_SHAPE_FACTOR
+        required_total_power = np.abs(fiber.beta2) / (fiber.gamma * (t0_seconds**2))
         
         # Apply deficit based on the true effective XPM
         deficit_p0 = required_total_power - (2 * effective_control_power)
-        # Divide power between the two axes
-        self.P0 = max(deficit_p0 / 2, 0.001)
+        # Total power required must not be less than 1 mw
+        self.P0 = max(deficit_p0, 0.001) - 0.00000005
 
         # String to Binary
         bits = self._string_to_bits(string_message)

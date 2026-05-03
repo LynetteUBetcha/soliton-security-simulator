@@ -73,3 +73,12 @@ def calculate_evm(received_symbols, ideal_symbols):
     evm_pct = np.sqrt(rms_error_power / reference_power) * 100
     
     return evm_pct
+
+def calculate_coupling_efficiency(center_wavelength_nm, control_beam_wavelength_nm):
+    """
+    Calculates coupling efficiency based on the fiber's center wavelength and control beam wavelength
+    """
+    delta_lambda_nm = abs(center_wavelength_nm - control_beam_wavelength_nm)
+    coupling_efficiency = np.exp(-(delta_lambda_nm / 5.0)**2)
+    
+    return coupling_efficiency

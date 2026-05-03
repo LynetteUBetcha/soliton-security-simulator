@@ -49,4 +49,7 @@ class ConfigHelper():
         # Reciever
         self.receiver_power_mw = config['receiver']['base_power_mw']
 
+        # --- Misc Settings ---
+        self.total_steps = config['parameters']['total_steps']
+
 

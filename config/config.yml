@@ -1,6 +1,6 @@
 # Fiber Optic Cable (Reference: ITU-T G.652 - https://www.itu.int/rec/T-REC-G.652-202408-I/en)
 fiber:
-  length_km: 50
+  length_km: 100
   attenuation_db_km: 0.35 # Max at 1550 nm        
   mode_field_diameter_um: 9.2   
   noise_per_km_w: 2.0e-8
@@ -43,3 +43,5 @@ attacker:
   siphon_percentage: 0.03
 
 # Misc Settings
+parameters:
+  total_steps: 500
