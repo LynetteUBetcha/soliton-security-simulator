@@ -33,7 +33,8 @@ class Scenario():
             n_linear_idx=config.n_linear_idx,
             n2_nonlinear_idx=config.n2_nonlinear_m2_w,
             macro_bend_loss_db=config.macro_bend_loss_db,
-            symbiotic_lock_tolerance=config.symbiotic_lock_tolerance
+            symbiotic_lock_tolerance=config.symbiotic_lock_tolerance,
+            noise_per_km_w=config.noise_per_km_w
         )
 
         rx = Receiver()

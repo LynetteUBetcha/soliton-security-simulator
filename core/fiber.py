@@ -14,7 +14,7 @@ class Fiber():
     
     def __init__(self, length_km, attenuation_db_km, mode_field_diameter_um, lambda_0_max_nm,
                  S_0_max, center_wavelength_nm, pmd_coefficient, n_linear_idx,
-                  n2_nonlinear_idx, macro_bend_loss_db, symbiotic_lock_tolerance):
+                  n2_nonlinear_idx, macro_bend_loss_db, symbiotic_lock_tolerance, noise_per_km_w):
         
         # Speed of light constant
         self.c = 299792458
@@ -27,6 +27,7 @@ class Fiber():
         self.n_linear_idx = n_linear_idx
         self.macro_bend_loss_db = macro_bend_loss_db
         self.symbiotic_lock_tolerance = symbiotic_lock_tolerance
+        self.noise_per_km_w = noise_per_km_w
 
         # Initialize fiber profile here so it can be dynamically updated later
         self.control_profile = None
@@ -61,6 +62,10 @@ class Fiber():
         Incorporates Cross-Phase Modulation (XPM) if a control beam is present.
         """
         dz = self.length_m / num_steps
+        dz_km = dz / 1000.0
+
+        # Calculate noise added for this distance slice
+        noise_per_step = self.noise_per_km_w * dz_km
 
         # Extract arrays for both polarizations
         A_x = signal.complex_amplitude_x
@@ -128,6 +133,10 @@ class Fiber():
             
             A_x = ifft(A_x_f)
             A_y = ifft(A_y_f)
+
+            # Add simulated natural noise from thermal jitter, ASE, etc.
+            A_x = phys.add_distributed_noise(A_x, noise_per_step)
+            A_y = phys.add_distributed_noise(A_y, noise_per_step)
 
             # Update signal object state and yield to the main control loop
             signal.complex_amplitude_x = A_x

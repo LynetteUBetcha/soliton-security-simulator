@@ -13,6 +13,7 @@ class ConfigHelper():
         self.length_km = config['fiber']['length_km']
         self.attenuation_db_km = config['fiber']['attenuation_db_km']
         self.mode_field_diameter_um = config['fiber']['mode_field_diameter_um']
+        self.noise_per_km_w = config['fiber']['noise_per_km_w']
         
         # Dispersion Logic
         self.lambda_0_min_nm = config['fiber']['lambda_0_min_nm']

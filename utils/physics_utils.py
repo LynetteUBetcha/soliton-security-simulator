@@ -42,14 +42,13 @@ def add_awgn_noise(complex_amplitude, snr_db):
     
     return complex_amplitude + noise
 
-def add_absolute_noise_floor(complex_amplitude, noise_floor_w=1e-6):
+def add_distributed_noise(complex_amplitude, noise_power_per_step):
     """
-    Injects a strict, absolute quantum/thermal noise floor.
-    If a pulse disperses and its power drops below this physical floor, 
-    it is permanently lost to ambient static.
+    Adds a fixed amount of physical noise to the channel.
     """
-    # Generate complex ambient static at a fixed physical power level
-    noise = np.sqrt(noise_floor_w / 2) * (np.random.randn() + 1j * np.random.randn())
+    noise = np.sqrt(noise_power_per_step / 2) * (
+        np.random.randn(len(complex_amplitude)) + 1j * np.random.randn(len(complex_amplitude))
+    )
     
     return complex_amplitude + noise
 

@@ -3,6 +3,7 @@ fiber:
   length_km: 50
   attenuation_db_km: 0.35 # Max at 1550 nm        
   mode_field_diameter_um: 9.2   
+  noise_per_km_w: 2.0e-8
   
   # Dispersion Logic
   lambda_0_min_nm: 1300.0
