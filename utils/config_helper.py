@@ -28,6 +28,7 @@ class ConfigHelper():
         # Physical Disturbance
         self.bend_radius_mm = config['fiber']['bend_radius_mm']
         self.macro_bend_loss_db = config['fiber']['macro_bend_loss_db']
+        self.symbiotic_lock_tolerance = config['fiber']['symbiotic_lock_tolerance']
 
         # --- Transmitter Parameters ---
         self.tx_wavelength_nm = config['transmitter']['wavelength_nm']

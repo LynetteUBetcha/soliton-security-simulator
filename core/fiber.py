@@ -14,7 +14,7 @@ class Fiber():
     
     def __init__(self, length_km, attenuation_db_km, mode_field_diameter_um, lambda_0_max_nm,
                  S_0_max, center_wavelength_nm, pmd_coefficient, n_linear_idx,
-                  n2_nonlinear_idx, macro_bend_loss_db):
+                  n2_nonlinear_idx, macro_bend_loss_db, symbiotic_lock_tolerance):
         
         # Speed of light constant
         self.c = 299792458
@@ -26,11 +26,13 @@ class Fiber():
         self.pmd_coefficient = pmd_coefficient
         self.n_linear_idx = n_linear_idx
         self.macro_bend_loss_db = macro_bend_loss_db
+        self.symbiotic_lock_tolerance = symbiotic_lock_tolerance
 
         # Initialize fiber profile here so it can be dynamically updated later
         self.control_profile = None
         self.coupling_efficiency = 0.0
         self.xpm_efficiency_profile = None
+
 
         # Effective area
         self.A_eff_m2 = np.pi * ((mode_field_diameter_um * 1e-6) / 2)**2
@@ -53,29 +55,6 @@ class Fiber():
         # Beta3
         self.beta3 = ((self.center_lambda_m / (2 * np.pi * self.c))**2 * (self.center_lambda_m**2 * S_0_max * 1e-3 + 2 * self.center_lambda_m * self.D * 1e-6))     
 
-    def calculate_control_beam_profile(self, rx_power_w, num_steps, tap_location_km=None, siphon_percentage=0.0):
-            """
-            Calculates the backward-propagating control beam power profile.
-            The beam starts at the Receiver (end of the array) and attenuates as it travels backward to the Tx.
-            """
-            dz = self.length_m / num_steps
-            control_profile = np.zeros(num_steps)
-            self.xpm_efficiency_profile = np.full(num_steps, 2.0) # profile starts with full parallel polarization
-            
-            for step in range(num_steps):
-                z_m = step * dz
-                # Calculate distance from the Receiver
-                distance_from_rx = self.length_m - z_m
-                
-                # Attenuate the Rx power based on distance traveled
-                control_profile[step] = rx_power_w * np.exp(-self.alpha_np_m * distance_from_rx)
-
-                if tap_location_km is not None and (z_m / 1000.0) <= tap_location_km:
-                    control_profile[step] = control_profile[step] * (1.0 - siphon_percentage)
-                    self.xpm_efficiency_profile[step] = np.random.uniform(0.67, 2.0)
-                
-            return control_profile
-
     def propagate_signal(self, signal: Signal, num_steps: int, control_beam=None):
         """
         Uses the Split-Step Fourier Method to propagate the DP-QPSK signal.
@@ -97,22 +76,20 @@ class Fiber():
             current_distance_m = step * dz
 
             if control_beam is not None:
-                # DISTRIBUTED RAMAN AMPLIFICATION (DRA)
-                # Calculate how much power the control beam has lost to the attacker's tap
+                # Distributed Raman Amplification (DRA)
+                # Calculate how much power the control beam has lost to the attacker's tap if it occurred
                 distance_to_rx = self.length_m - current_distance_m
                 healthy_baseline_power = control_beam["power_w"] * np.exp(-self.baseline_alpha_np_m * distance_to_rx)
                 survival_ratio = self.control_profile[step] / max(healthy_baseline_power, 1e-20)
                 
                 # Apply the Symbiotic Gain to counter natural attenuation
-                lock_tolerance = 0.99
+                lock_tolerance = self.symbiotic_lock_tolerance
                 if survival_ratio >= lock_tolerance:
                     effective_alpha = self.alpha_np_m * (1.0 - survival_ratio)
-                    xpm_multiplier = 2.0
                 else:
                     effective_alpha = self.alpha_np_m
-                    xpm_multiplier = 0.0
                 
-                # CROSS-PHASE MODULATION (XPM)
+                # Cross-Phase Modulation (XPM)
                 # Apply the walk-off penalty to calculate the effective interference power
                 P_control = self.control_profile[step] * self.coupling_efficiency
 
@@ -138,7 +115,7 @@ class Fiber():
 
             if control_beam is not None and survival_ratio < lock_tolerance:
                 # The tumbling control beam randomly rotates the phase of the forward pulse.
-                # Evaluated every step, this creates a chaotic "Random Walk" that destroys QPSK data.
+                # This creates a chaotic "Random Walk" that destroys QPSK data.
                 phase_jitter_x = np.exp(1j * np.random.uniform(-0.15, 0.15, size=len(A_x))) 
                 phase_jitter_y = np.exp(1j * np.random.uniform(-0.15, 0.15, size=len(A_y))) 
                 
@@ -198,4 +175,28 @@ class Fiber():
 
         delta_lambda_nm = abs(self.center_wavelength_nm - control_beam["wavelength_nm"])
         self.coupling_efficiency = np.exp(-(delta_lambda_nm / 5.0)**2)
+
+    def calculate_control_beam_profile(self, rx_power_w, num_steps, tap_location_km=None, siphon_percentage=0.0):
+        """
+        Calculates the backward-propagating control beam power profile.
+        The beam starts at the Receiver (end of the array) and attenuates as it travels backward to the Tx.
+        """
+        dz = self.length_m / num_steps
+        control_profile = np.zeros(num_steps)
+        self.xpm_efficiency_profile = np.full(num_steps, 2.0) # profile starts with full, clean parallel polarization
+        
+        for step in range(num_steps):
+            z_m = step * dz
+            # Calculate distance from the Receiver
+            distance_from_rx = self.length_m - z_m
+            
+            # Attenuate the Rx power based on distance traveled
+            control_profile[step] = rx_power_w * np.exp(-self.alpha_np_m * distance_from_rx)
+
+            # Update the XPM profile with random noise from tap location forward to transmitter
+            if tap_location_km is not None and (z_m / 1000.0) <= tap_location_km:
+                control_profile[step] = control_profile[step] * (1.0 - siphon_percentage)
+                self.xpm_efficiency_profile[step] = np.random.uniform(0.67, 2.0)
+            
+        return control_profile
 

@@ -42,7 +42,7 @@ def add_awgn_noise(complex_amplitude, snr_db):
     
     return complex_amplitude + noise
 
-def add_absolute_noise_floor(self, complex_amplitude, noise_floor_w=1e-6):
+def add_absolute_noise_floor(complex_amplitude, noise_floor_w=1e-6):
     """
     Injects a strict, absolute quantum/thermal noise floor.
     If a pulse disperses and its power drops below this physical floor, 

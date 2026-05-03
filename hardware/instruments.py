@@ -26,11 +26,8 @@ class OpticalBackscatterReflectometer():
     def generate_physical_seed(self, fiber: Fiber):
         """
         Scans the fiber and converts the analog profile into an integer seed.
-        """
-        # Analog Scan (Returns an array of local attenuation values)
-        num_points = int(fiber.length_m / self.spatial_resolution_m)
-        backscatter_profile = np.full(num_points, fiber.alpha_np_m)
-        
+        """        
+        backscatter_profile = self.scan_fiber(fiber)
         # Try finding a real backscatter profile to use?
         # and then: backscatter_profile += np.random.normal(0, 1e-6, num_points)
 

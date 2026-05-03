@@ -18,6 +18,7 @@ fiber:
   # Physical Disturbance
   bend_radius_mm: 30.0
   macro_bend_loss_db: 0.1
+  symbiotic_lock_tolerance: 0.99
 
 # Transmission Source
 transmitter:
@@ -39,3 +40,5 @@ security:
 attacker:
   tap_enabled: true
   siphon_percentage: 0.03
+
+# Misc Settings
