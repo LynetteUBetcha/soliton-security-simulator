@@ -1,8 +1,9 @@
 # Fiber Optic Cable (Reference: ITU-T G.652 - https://www.itu.int/rec/T-REC-G.652-202408-I/en)
 fiber:
-  length_km: 50.0
+  length_km: 50
   attenuation_db_km: 0.35 # Max at 1550 nm        
   mode_field_diameter_um: 9.2   
+  noise_per_km_w: 2.0e-8
   
   # Dispersion Logic
   lambda_0_min_nm: 1300.0
@@ -18,16 +19,18 @@ fiber:
   # Physical Disturbance
   bend_radius_mm: 30.0
   macro_bend_loss_db: 0.1
+  symbiotic_lock_tolerance: 0.99
 
 # Transmission Source
 transmitter:
   wavelength_nm: 1550
-  repetition_rate_ghz: 100
+  repetition_rate_ps: 100
   power_mw: 5.0
-  pulse_width_ps: 10.0
+  pulse_width_ps: 50.0
+  msg: "Do not go gentle into that good night,\nOld age should burn and rave at close of day;\nRage, rage against the dying of the light."
 
 receiver:
-  base_power_mw: 0.010
+  base_power_mw: 0.002
 
 # DSP & OBR
 security:
@@ -39,3 +42,9 @@ security:
 attacker:
   tap_enabled: true
   siphon_percentage: 0.03
+  attack_location_km: 25.0
+  km_until_attack_occurs: 10.0 # the number of km the signal has traveled before attacker bends the fiber
+
+# Misc Settings
+parameters:
+  total_steps: 500

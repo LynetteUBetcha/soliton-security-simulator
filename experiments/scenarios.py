@@ -1,25 +1,27 @@
-import copy
-import numpy as np
 from utils.config_helper import ConfigHelper
 from core.fiber import Fiber
 from hardware.transmitter import Transmitter
 from hardware.receiver import Receiver
 from experiments.attacker import Attacker
 from hardware.instruments import OpticalBackscatterReflectometer
-from pathlib import Path
+from utils.logger import Logger
+from utils.visualizer import Plotter
 
 class Scenario():
     def __init__(self):
         pass
 
-    def run_scenario(attack_enabled=True):
+    def run_scenario(attack_enabled=True, pre_bend=True, save_plots=True):
 
-        print("=== INITIALIZING SYMBIOTIC FIBER SIMULATION ===")
-        
-        config_path = Path(__file__).resolve().parent.parent / "config/config.yml"
+        log = Logger()
+        log.log_config()
+
+        plotter = Plotter(save_plots)
+
+        print("\n=== INITIALIZING SYMBIOTIC FIBER SIMULATION ===")
 
         # 1. Load System Configuration
-        config = ConfigHelper(config_path)
+        config = ConfigHelper()
         
         # 2. Instantiate Hardware Modules
         fiber = Fiber(
@@ -32,98 +34,111 @@ class Scenario():
             pmd_coefficient=config.pmd_coefficient,
             n_linear_idx=config.n_linear_idx,
             n2_nonlinear_idx=config.n2_nonlinear_m2_w,
-            macro_bend_loss_db=config.macro_bend_loss_db
+            macro_bend_loss_db=config.macro_bend_loss_db,
+            symbiotic_lock_tolerance=config.symbiotic_lock_tolerance,
+            noise_per_km_w=config.noise_per_km_w
         )
 
         rx = Receiver()
         tx = Transmitter(
             laser_power_w=config.tx_power_mw,
-            pulse_width_ps=config.pulse_width_ps
+            pulse_width_ps=config.pulse_width_ps,
+            repition_rate_ps=config.tx_repetition_rate_ps
         )
         attacker = Attacker(siphon_percentage=config.siphon_percentage)
 
         # 3. Define the Scenario Parameters
-        secret_message = "TEST_SECURE_LINK"
-        total_steps = 500  # Number of SSFM slices for the 50km run
-        step_size_km = config.length_km / total_steps
+        secret_message = config.message
+        total_steps = config.total_steps
+        stolen_string = None     
+
+        attack_location_km = config.attack_location_km
+        time_to_attack = config.km_until_attack_occurs
         
-        attack_location_km = 25.0
-        steps_to_attack = int(attack_location_km / step_size_km)
-        
-        # --- PHASE 1: THE SYMBIOTIC HANDSHAKE ---
-        print("\n--- PHASE 1: ESTABLISHING LOCK ---")
+        # 4. Symbiotic handshake
+        print("\n--- ESTABLISHING LOCK ---")
         # Rx turns on the backward-propagating control laser
         physical_seed = OpticalBackscatterReflectometer().generate_physical_seed(fiber)
         
-        control_beam = rx.emit_symbiotic_control_beam(physical_seed=physical_seed)
+        control_beam = rx.emit_symbiotic_control_beam(physical_seed=physical_seed)             
         
-        # Calculate what that beam looks like across the undisturbed fiber
-        baseline_control_profile = fiber.calculate_control_beam_profile(
-            control_beam["power_w"], total_steps
-        )
-        
-        # Tx measures the beam arriving at z=0 and sets the exact deficit P0
-        power_arriving_at_tx = baseline_control_profile[0]
-        signal = tx.generate_optical_payload(secret_message, power_arriving_at_tx, fiber)
+        signal = tx.generate_optical_payload(secret_message, control_beam, total_steps, fiber)
         print(f"[TX] Payload Generated. Target string: {secret_message}")
 
-        # --- PHASE 2: PRE-ATTACK PROPAGATION ---
-        print("\n--- PHASE 2: HEALTHY PROPAGATION ---")
+        # Plot signal before propagation
+        plotter.plot_time_domain(signal, title=f"TX: Ideal {config.pulse_width_ps}ps Soliton Train")
+        plotter.plot_constellation(signal, title="TX: Pristine DP-QPSK Constellation")
+
+        # 5. Propagate the signal through the fiber line
+        print("\n--- PROPAGATION ---")
         current_distance = 0.0
-        
+
+        # Snapshot profile for plotting later
+        baseline_profile = fiber.calculate_control_beam_profile(rx_power_w=control_beam["power_w"], num_steps=config.total_steps)
+
         if attack_enabled:
+
             # Propagate up to the exact attack location
-            pre_attack_generator = fiber.propagate_signal(signal, steps_to_attack, control_beam)
-            for current_signal, dist_m in pre_attack_generator:
+            attack_generator = fiber.propagate_signal(signal, total_steps, control_beam)
+            # if the fiber was already bent to begin with, tap the fiber now to induce changes beyond what the control profile should have
+            if pre_bend:
+                attacker.tap_fiber(fiber, bend_radius_mm=config.bend_radius_mm)
+                fiber.update_control_profile(control_beam, total_steps, attack_location_km, config.siphon_percentage)
+
+            for current_signal, dist_m in attack_generator:
                 current_distance = dist_m / 1000.0 # Convert to km
                 
-                # Optional: Log stability at 10km intervals
-                if int(current_distance) % 10 == 0 and int(current_distance) != 0:
-                    print(f"[{current_distance:.1f} km] Signal stable. N=1.0")
+                # Log stability at 10km intervals
+                if current_distance % 10 == 0 and int(current_distance) != 0:
+                    rx_symbols_x, rx_symbols_y = rx.extract_symbols(current_signal)
+                    final_string = rx.read_optical_payload(rx_symbols_x, rx_symbols_y)
+                    print(f"\nSTRING AT {current_distance} KM: {final_string}")
 
-            # --- PHASE 3: THE PHYSICAL ATTACK ---
-            print("\n--- PHASE 3: BREACH DETECTED ---")
-            # Attacker bends the fiber, instantly changing its physical attenuation
-            attacker.tap_fiber(fiber, bend_radius_mm=config.bend_radius_mm)
-            
-            # Because the fiber changed, the Control Beam profile instantly degrades 
-            # from the tap location backward. We must recalculate it.
-            remaining_steps = total_steps - steps_to_attack
-            compromised_control_profile = fiber.calculate_control_beam_profile(
-                control_beam["power_w"], remaining_steps
-            )
+                # if attack occurs while the solitons are on their way to the receiver, bend the fiber now
+                if not pre_bend and current_distance == time_to_attack: 
+                     print("\n--- FIBER TAP ATTACK OCCURRED UPSTREAM ---")
+                     attacker.tap_fiber(fiber, bend_radius_mm=config.bend_radius_mm)
 
-            # --- PHASE 4: POST-ATTACK COLLAPSE & INTERCEPTION ---
-            print("\n--- PHASE 4: ENTROPIC DISPERSAL ---")
-            # We resume propagation, but now feeding the compromised control beam into the engine
-            post_attack_generator = fiber.propagate_signal(signal, remaining_steps, control_beam)
-            
-            interception_made = False
-            
-            for current_signal, dist_m in post_attack_generator:
-                current_distance = (dist_m / 1000.0) + attack_location_km
-                
-                # Give the physics engine 5 km to let the unsupported solitons shatter
-                if current_distance >= attack_location_km + 5.0 and not interception_made:
-                    print(f"[{current_distance:.1f} km] [ATTACKER] Siphoning payload...")
-                    
-                    # Attacker pulls the light out of the fiber
-                    stolen_string = attacker.intercept_payload(current_signal)
-                    print(f"[ATTACKER] Intercepted String: {stolen_string}")
-                    interception_made = True
+                     fiber.update_control_profile(control_beam, total_steps, attack_location_km, config.siphon_percentage)
+
+                # Check for attack
+                if current_distance == attack_location_km:
+
+                     # Attacker pulls small amount of light out of the fiber
+                     stolen_string = attacker.intercept_payload(current_signal)
+                     print("\n--- ATTACKER READING STRING ---")
+                     print(f"\nIntercepted String: {stolen_string}")
+                     current_signal.apply_siphon_loss(config.siphon_percentage)
+            plotter.plot_time_domain(current_signal, title=f"Attacker: Received Envelope at {config.attack_location_km}km")
+            plotter.plot_constellation(current_signal, title=f"Degraded Constellation at {config.attack_location_km}km")
+
+            attacked_profile = fiber.calculate_control_beam_profile(rx_power_w=control_beam["power_w"], num_steps=config.total_steps, 
+                                                                    tap_location_km=config.attack_location_km, siphon_percentage=config.siphon_percentage)
+
         else:
             generator = fiber.propagate_signal(signal, total_steps, control_beam)
 
             for current_signal, dist_m in generator:
                 current_distance = dist_m / 1000.0
-                if int(current_distance) % 10 == 0 and int(current_distance) != 0:
-                    print(f"[{current_distance:.1f} km] Signal stable. Symbiotic lock holding.")
+                if current_distance % 10 == 0 and int(current_distance) != 0:
+                    rx_symbols_x, rx_symbols_y = rx.extract_symbols(current_signal)
+                    final_string = rx.read_optical_payload(rx_symbols_x, rx_symbols_y)
+                    print(f"\nSTRING AT {current_distance} KM: {final_string}")
 
-        # --- PHASE 5: LEGITIMATE RECEIVER READOUT ---
-        print("\n--- PHASE 5: LINK TERMINATION ---")
-        # The surviving, highly entropic light reaches the Rx at 50.0 km
+        # 6. The receiver reads whatever is there
+        print("\n--- LINK TERMINATION ---\n")
+        # The surviving light makes it to the rx
         rx_symbols_x, rx_symbols_y = rx.extract_symbols(current_signal)
         final_string = rx.read_optical_payload(rx_symbols_x, rx_symbols_y)
         
         print(f"[RX] Final Received String: {final_string}")
-        print("=== SIMULATION COMPLETE ===")
+
+        # Log and plot results
+        log.log_results(attack_enabled, pre_bend, secret_message, final_string, stolen_string)
+        
+        if attack_enabled:
+            plotter.plot_spatial_profile(fiber, baseline_profile, attacked_profile)
+        else:
+            plotter.plot_spatial_profile(fiber, baseline_profile)
+            
+        print("\n=== SIMULATION COMPLETE ===\n")

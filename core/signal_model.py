@@ -1,13 +1,16 @@
 import numpy as np
 
+SECONDS_PER_PICOSECOND = 1e-12
+SOLITON_SHAPE_FACTOR = 1.763
+
 class Signal():
     """
     Represents a dual-polarization QPSK modulated optical pulse train.
     """
     def __init__(self, num_samples, time_window_ps, peak_power_w, pulse_width_ps, symbols_x, symbols_y):
         self.num_samples = num_samples
-        self.time_window_s = time_window_ps * 1e-12
-        self.T0_s = pulse_width_ps * 1e-12
+        self.time_window_s = time_window_ps * SECONDS_PER_PICOSECOND
+        self.T0_s = (pulse_width_ps * SECONDS_PER_PICOSECOND) / SOLITON_SHAPE_FACTOR
         self.P0_w = peak_power_w
         
         # Store ideal data for EVM calculations
@@ -24,9 +27,9 @@ class Signal():
         self.time_step = self.time_window_s / num_samples
         
         # Generate the dual-polarization modulated data stream
-        self.complex_amplitude_x, self.complex_amplitude_y = self._generate_dp_pulse_train()
+        self.complex_amplitude_x, self.complex_amplitude_y = self.generate_dp_pulse_train()
 
-    def _generate_dp_pulse_train(self):
+    def generate_dp_pulse_train(self):
         """
         Generates a sequence of solitons across both X and Y polarizations.
         Splits total peak power equally between the two axes.
@@ -43,8 +46,11 @@ class Signal():
         for i in range(self.num_symbols):
             pulse_center_t = start_time + (i * bit_period_s)
             
+            # clip extreme sizes to avoid overflow of float64 dtype
+            t_norm = (self.time_array - pulse_center_t) / self.T0_s
+            t_norm_clipped = np.clip(t_norm, -700, 700)
             # The physical sech envelope (same for both axes)
-            envelope = np.sqrt(axis_power) * (1.0 / np.cosh((self.time_array - pulse_center_t) / self.T0_s))
+            envelope = np.sqrt(axis_power) * (1.0 / np.cosh(t_norm_clipped))
             
             # X-Axis Modulation
             sym_x = self.ideal_symbols_x[i]
@@ -88,3 +94,11 @@ class Signal():
         """
         total_power = np.abs(self.complex_amplitude_x)**2 + np.abs(self.complex_amplitude_y)**2
         return np.max(total_power)
+    
+    def apply_siphon_loss(self, siphon_percentage):
+        """
+        Adjusts the amplitudes of the current signal based on siphon percentage
+        """
+        amplitude_retention = np.sqrt(1.0 - siphon_percentage)
+        self.complex_amplitude_x *= amplitude_retention
+        self.complex_amplitude_y *= amplitude_retention

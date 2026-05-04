@@ -24,7 +24,7 @@ class Receiver():
         np.random.seed(physical_seed)
         
         # Wavelength Tuning (+/- 2.0 nm shift based on the seed)
-        # The control beam be slightly offset from the Soliton to avoid direct interference,
+        # The control beam should be slightly offset from the Soliton to avoid direct interference,
         # but the exact offset dictates the XPM coupling efficiency.
         wavelength_shift = np.random.uniform(-2.0, 2.0)
         tuned_wavelength_nm = self.base_wavelength_nm + wavelength_shift
@@ -49,27 +49,31 @@ class Receiver():
         num_symbols = len(signal.ideal_symbols_x)
         received_symbols_x = []
         received_symbols_y = []
-        
+
         # Recreate the timing grid used by the Transmitter
         bit_period_s = signal.time_window_s / (num_symbols + 1)
-        start_time = -signal.time_window_s/2 + bit_period_s
+        start_time = -signal.time_window_s/2 + bit_period_s        
         
         for i in range(num_symbols):
-            # Calculate the exact time this specific pulse should peak
             target_time = start_time + (i * bit_period_s)
-            
-            # Find the index in the time_array that is closest to our target time
-            # np.abs() finds the distance, np.argmin() finds the index of the smallest distance
             closest_index = np.argmin(np.abs(signal.time_array - target_time))
+
+            received_symbols_x.append(signal.complex_amplitude_x[closest_index])
+            received_symbols_y.append(signal.complex_amplitude_y[closest_index])
             
-            # Extract the complex amplitude at that exact index
-            sampled_x = signal.complex_amplitude_x[closest_index]
-            sampled_y = signal.complex_amplitude_y[closest_index]
-            
-            received_symbols_x.append(sampled_x)
-            received_symbols_y.append(sampled_y)
-            
-        return received_symbols_x, received_symbols_y
+        # Convert to numpy arrays for vector math
+        rx_x = np.array(received_symbols_x)
+        rx_y = np.array(received_symbols_y)
+        
+        # Calculate how far the fiber twisted the first "Pilot" symbol
+        phase_error_x = np.angle(rx_x[0]) - np.angle(signal.ideal_symbols_x[0])
+        phase_error_y = np.angle(rx_y[0]) - np.angle(signal.ideal_symbols_y[0])
+        
+        # Unwind the entire array by the accumulated error
+        rx_x = rx_x * np.exp(-1j * phase_error_x)
+        rx_y = rx_y * np.exp(-1j * phase_error_y)
+        
+        return rx_x.tolist(), rx_y.tolist()
 
     def read_optical_payload(self, symbols_x, symbols_y):
         """

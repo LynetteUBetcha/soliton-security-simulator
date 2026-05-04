@@ -1,30 +1,43 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 from core.signal_model import Signal
+import utils.physics_utils as phys
 import math
 import numpy as np
 
 if TYPE_CHECKING:
     from core.fiber import Fiber
 
+SECONDS_PER_PICOSECOND = 1e-12
+SOLITON_SHAPE_FACTOR = 1.763
+
 class Transmitter():
-    def __init__(self, laser_power_w, pulse_width_ps):
+    def __init__(self, laser_power_w, pulse_width_ps, repition_rate_ps):
         self.P0 = laser_power_w
         self.T0 = pulse_width_ps
+        self.repition_rate_ps = repition_rate_ps
 
-    def generate_optical_payload(self, string_message, control_beam_power_at_tx, fiber: Fiber):
+    def generate_optical_payload(self, string_message, control_beam, total_steps, fiber: Fiber):
         """
         Takes a string, converts to binary, maps to DP-QPSK, and generates the Signal.
         """
+        # Calculate the path-averaged control power across the whole fiber
+        baseline_profile = fiber.calculate_control_beam_profile(control_beam["power_w"], total_steps)
+        average_control_power = np.mean(baseline_profile)
 
-        # 1. What power does the fiber physics demand for a perfect soliton?
-        required_total_power = np.abs(fiber.beta2) / (fiber.gamma * (self.T0 * 1e-12)**2)
+        # Calculate the exact Walk-Off Penalty based on the Rx's wavelength shift
+        coupling_efficiency = phys.calculate_coupling_efficiency(fiber.center_wavelength_nm, control_beam["wavelength_nm"])
         
-        # 2. Subtract the interference provided by the control beam (XPM)
-        # We subtract 2x the control beam power due to the XPM multiplier
-        deficit_p0 = required_total_power - (2 * control_beam_power_at_tx)
+        effective_control_power = average_control_power * coupling_efficiency
+
+        # Calculate the exact power demand
+        t0_seconds = (self.T0 * SECONDS_PER_PICOSECOND) / SOLITON_SHAPE_FACTOR
+        required_total_power = np.abs(fiber.beta2) / (fiber.gamma * (t0_seconds**2))
         
-        self.P0 = max(deficit_p0, 0.001) # Prevent negative power
+        # Apply deficit based on the true effective XPM
+        deficit_p0 = required_total_power - (2 * effective_control_power)
+        # Total power required must not be less than 1 mw
+        self.P0 = max(deficit_p0, 0.001)
 
         # String to Binary
         bits = self._string_to_bits(string_message)
@@ -43,7 +56,7 @@ class Transmitter():
         symbols_y = self._bits_to_qpsk(bits_y)
         
         # Instantiate and return the Signal
-        time_window = len(symbols_x) * 50 # 50ps per bit period
+        time_window = len(symbols_x) * self.repition_rate_ps
 
         # Dynamically calculate the num_samples using next highest power of 2
         min_samples_needed = len(symbols_x) * 128
