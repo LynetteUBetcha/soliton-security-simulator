@@ -27,7 +27,7 @@ class Logger():
         """
         Append simulation results to the log file.
         """
-        with open(filename, 'a') as results_file:
+        with open(filename, 'a', encoding='utf-8', errors='replace') as results_file:
             results_file.write("\n--- SIMULATION RESULTS ---\n\n")
             results_file.write(f"Attack Enabled: {atk_enabled}\n")
             results_file.write(f"Cable Pre-Bent at Start: {pre_bend}\n")
