@@ -113,7 +113,7 @@ class Plotter():
     def _handle_output(self, filename_base):
         """Helper to either show or save the plot."""
         current_time = datetime.now()
-        formatted_time = current_time.strftime("%d-%m-%Y_%H:%M:%S")
+        formatted_time = current_time.strftime("%Y%m%d_%H%M%S")
         if self.save_plots:
             filepath = os.path.join(self.output_dir, f"{filename_base}{formatted_time}.png")
             plt.savefig(filepath)
