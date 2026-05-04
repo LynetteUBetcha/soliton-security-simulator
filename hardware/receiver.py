@@ -2,7 +2,6 @@ from __future__ import annotations
 import numpy as np
 from typing import TYPE_CHECKING
 from utils.config_helper import ConfigHelper
-import utils.physics_utils as phys
 
 if TYPE_CHECKING:
     from utils.config_helper import ConfigHelper

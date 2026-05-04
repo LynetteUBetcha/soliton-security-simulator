@@ -1,12 +1,15 @@
 import yaml
 from pathlib import Path
 
-config_path = Path(__file__).parent.parent / "config/config.yml"
-
 class ConfigHelper():
 
-    def __init__(self, config_path = config_path):
-        with open(config_path, "r") as file:
+    def __init__(self, config_path=None):
+        
+        if config_path is None:
+            self.config_path = Path(__file__).parent.parent / "config/config.yml"
+        else:
+            self.config_path = config_path
+        with open(self.config_path, "r") as file:
             config = yaml.safe_load(file)
 
         # --- Fiber Parameters ---

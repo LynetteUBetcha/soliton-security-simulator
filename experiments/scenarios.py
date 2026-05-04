@@ -1,12 +1,10 @@
-import copy
-import numpy as np
 from utils.config_helper import ConfigHelper
 from core.fiber import Fiber
 from hardware.transmitter import Transmitter
 from hardware.receiver import Receiver
 from experiments.attacker import Attacker
 from hardware.instruments import OpticalBackscatterReflectometer
-from pathlib import Path
+from utils.logger import Logger
 
 class Scenario():
     def __init__(self):
@@ -14,12 +12,13 @@ class Scenario():
 
     def run_scenario(attack_enabled=True, pre_bend=True):
 
-        print("=== INITIALIZING SYMBIOTIC FIBER SIMULATION ===")
-        
-        config_path = Path(__file__).resolve().parent.parent / "config/config.yml"
+        log = Logger()
+        log.log_config()
+
+        print("\n=== INITIALIZING SYMBIOTIC FIBER SIMULATION ===")
 
         # 1. Load System Configuration
-        config = ConfigHelper(config_path)
+        config = ConfigHelper()
         
         # 2. Instantiate Hardware Modules
         fiber = Fiber(
@@ -47,7 +46,8 @@ class Scenario():
 
         # 3. Define the Scenario Parameters
         secret_message = config.message
-        total_steps = config.total_steps     
+        total_steps = config.total_steps
+        stolen_string = None     
 
         attack_location_km = config.attack_location_km
         time_to_attack = config.km_until_attack_occurs
@@ -111,10 +111,11 @@ class Scenario():
                     print(f"\nSTRING AT {current_distance} KM: {final_string}")
 
         # 6. The receiver reads whatever is there
-        print("\n--- LINK TERMINATION ---")
+        print("\n--- LINK TERMINATION ---\n")
         # The surviving light makes it to the rx
         rx_symbols_x, rx_symbols_y = rx.extract_symbols(current_signal)
         final_string = rx.read_optical_payload(rx_symbols_x, rx_symbols_y)
         
         print(f"[RX] Final Received String: {final_string}")
-        print("=== SIMULATION COMPLETE ===")
+        log.log_results(attack_enabled, pre_bend, secret_message, final_string, stolen_string)
+        print("\n=== SIMULATION COMPLETE ===\n")
