@@ -12,7 +12,7 @@ class Scenario():
     def __init__(self):
         pass
 
-    def run_scenario(attack_enabled=True):
+    def run_scenario(attack_enabled=True, pre_bend=True):
 
         print("=== INITIALIZING SYMBIOTIC FIBER SIMULATION ===")
         
@@ -46,15 +46,11 @@ class Scenario():
         attacker = Attacker(siphon_percentage=config.siphon_percentage)
 
         # 3. Define the Scenario Parameters
-        secret_message = "TEST_SECURE_LINK"
-        total_steps = config.total_steps
-        step_size_km = config.length_km / total_steps        
+        secret_message = config.message
+        total_steps = config.total_steps     
 
-        attack_location_km = 25.0
-        time_to_attack = 10.0 # distance at which signal has propagated to by attack time
-        steps_to_attack = int(attack_location_km / step_size_km)
-        print(f"""should be {steps_to_attack} steps to attack.
-              step size km: {step_size_km}""")
+        attack_location_km = config.attack_location_km
+        time_to_attack = config.km_until_attack_occurs
         
         # --- PHASE 1: THE SYMBIOTIC HANDSHAKE ---
         print("\n--- PHASE 1: ESTABLISHING LOCK ---")
@@ -67,7 +63,7 @@ class Scenario():
         print(f"[TX] Payload Generated. Target string: {secret_message}")
 
         # --- PHASE 2: PRE-ATTACK PROPAGATION ---
-        print("\n--- PHASE 2: HEALTHY PROPAGATION ---")
+        print("\n--- PHASE 2: PROPAGATION ---")
         current_distance = 0.0
         
         if attack_enabled:
@@ -77,10 +73,10 @@ class Scenario():
                 current_distance = dist_m / 1000.0 # Convert to km
                 
                 # Log stability at 10km intervals
-                if int(current_distance) % 10 == 0 and int(current_distance) != 0:
+                if current_distance % 10 == 0 and int(current_distance) != 0:
                     rx_symbols_x, rx_symbols_y = rx.extract_symbols(current_signal)
                     final_string = rx.read_optical_payload(rx_symbols_x, rx_symbols_y)
-                    print(f"Current string at {current_distance}: {final_string}")
+                    print(f"\nSTRING AT {current_distance} KM: {final_string}")
 
                 if current_distance == time_to_attack:
                      print("\n--- FIBER TAP ATTACK ---")
@@ -101,10 +97,10 @@ class Scenario():
 
             for current_signal, dist_m in generator:
                 current_distance = dist_m / 1000.0
-                if int(current_distance) % 10 == 0 and int(current_distance) != 0:
-                            rx_symbols_x, rx_symbols_y = rx.extract_symbols(current_signal)
-                            final_string = rx.read_optical_payload(rx_symbols_x, rx_symbols_y)
-                            print(f"Current string at {current_distance}: {final_string}")
+                if current_distance % 10 == 0 and int(current_distance) != 0:
+                    rx_symbols_x, rx_symbols_y = rx.extract_symbols(current_signal)
+                    final_string = rx.read_optical_payload(rx_symbols_x, rx_symbols_y)
+                    print(f"\nSTRING AT {current_distance} KM: {final_string}")
 
         # --- PHASE 5: LEGITIMATE RECEIVER READOUT ---
         print("\n--- PHASE 5: LINK TERMINATION ---")

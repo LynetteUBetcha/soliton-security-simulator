@@ -36,6 +36,7 @@ class ConfigHelper():
         self.tx_repetition_rate_ps = config['transmitter']['repetition_rate_ps']
         self.tx_power_mw = config['transmitter']['power_mw']
         self.pulse_width_ps = config['transmitter']['pulse_width_ps']
+        self.message = config['transmitter']['msg']
 
         # --- DSP & Security Parameters ---
         self.stability_threshold = config['security']['stability_threshold']
@@ -45,6 +46,8 @@ class ConfigHelper():
         # --- Attacker Scenario Parameters ---
         self.tap_enabled = config['attacker']['tap_enabled']
         self.siphon_percentage = config['attacker']['siphon_percentage']
+        self.attack_location_km = config['attacker']['attack_location_km']
+        self.km_until_attack_occurs = config['attacker']['km_until_attack_occurs']
 
         # Reciever
         self.receiver_power_mw = config['receiver']['base_power_mw']
