@@ -5,15 +5,18 @@ from hardware.receiver import Receiver
 from experiments.attacker import Attacker
 from hardware.instruments import OpticalBackscatterReflectometer
 from utils.logger import Logger
+from utils.visualizer import Plotter
 
 class Scenario():
     def __init__(self):
         pass
 
-    def run_scenario(attack_enabled=True, pre_bend=True):
+    def run_scenario(attack_enabled=True, pre_bend=True, save_plots=True):
 
         log = Logger()
         log.log_config()
+
+        plotter = Plotter(save_plots)
 
         print("\n=== INITIALIZING SYMBIOTIC FIBER SIMULATION ===")
 
@@ -62,10 +65,17 @@ class Scenario():
         signal = tx.generate_optical_payload(secret_message, control_beam, total_steps, fiber)
         print(f"[TX] Payload Generated. Target string: {secret_message}")
 
+        # Plot signal before propagation
+        plotter.plot_time_domain(signal, title=f"TX: Ideal {config.pulse_width_ps}ps Soliton Train")
+        plotter.plot_constellation(signal, title="TX: Pristine DP-QPSK Constellation")
+
         # 5. Propagate the signal through the fiber line
         print("\n--- PROPAGATION ---")
         current_distance = 0.0
-        
+
+        # Snapshot profile for plotting later
+        baseline_profile = fiber.calculate_control_beam_profile(rx_power_w=control_beam["power_w"], num_steps=config.total_steps)
+
         if attack_enabled:
 
             # Propagate up to the exact attack location
@@ -99,6 +109,11 @@ class Scenario():
                      print("\n--- ATTACKER READING STRING ---")
                      print(f"\nIntercepted String: {stolen_string}")
                      current_signal.apply_siphon_loss(config.siphon_percentage)
+            plotter.plot_time_domain(current_signal, title=f"Attacker: Received Envelope at {config.attack_location_km}km")
+            plotter.plot_constellation(current_signal, title=f"Degraded Constellation at {config.attack_location_km}km")
+
+            attacked_profile = fiber.calculate_control_beam_profile(rx_power_w=control_beam["power_w"], num_steps=config.total_steps, 
+                                                                    tap_location_km=config.attack_location_km, siphon_percentage=config.siphon_percentage)
 
         else:
             generator = fiber.propagate_signal(signal, total_steps, control_beam)
@@ -117,5 +132,13 @@ class Scenario():
         final_string = rx.read_optical_payload(rx_symbols_x, rx_symbols_y)
         
         print(f"[RX] Final Received String: {final_string}")
+
+        # Log and plot results
         log.log_results(attack_enabled, pre_bend, secret_message, final_string, stolen_string)
+        
+        if attack_enabled:
+            plotter.plot_spatial_profile(fiber, baseline_profile, attacked_profile)
+        else:
+            plotter.plot_spatial_profile(fiber, baseline_profile)
+            
         print("\n=== SIMULATION COMPLETE ===\n")
