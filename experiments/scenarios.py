@@ -52,8 +52,8 @@ class Scenario():
         attack_location_km = config.attack_location_km
         time_to_attack = config.km_until_attack_occurs
         
-        # --- PHASE 1: THE SYMBIOTIC HANDSHAKE ---
-        print("\n--- PHASE 1: ESTABLISHING LOCK ---")
+        # 4. Symbiotic handshake
+        print("\n--- ESTABLISHING LOCK ---")
         # Rx turns on the backward-propagating control laser
         physical_seed = OpticalBackscatterReflectometer().generate_physical_seed(fiber)
         
@@ -62,13 +62,19 @@ class Scenario():
         signal = tx.generate_optical_payload(secret_message, control_beam, total_steps, fiber)
         print(f"[TX] Payload Generated. Target string: {secret_message}")
 
-        # --- PHASE 2: PRE-ATTACK PROPAGATION ---
-        print("\n--- PHASE 2: PROPAGATION ---")
+        # 5. Propagate the signal through the fiber line
+        print("\n--- PROPAGATION ---")
         current_distance = 0.0
         
         if attack_enabled:
+
             # Propagate up to the exact attack location
             attack_generator = fiber.propagate_signal(signal, total_steps, control_beam)
+            # if the fiber was already bent to begin with, tap the fiber now to induce changes beyond what the control profile should have
+            if pre_bend:
+                attacker.tap_fiber(fiber, bend_radius_mm=config.bend_radius_mm)
+                fiber.update_control_profile(control_beam, total_steps, attack_location_km, config.siphon_percentage)
+
             for current_signal, dist_m in attack_generator:
                 current_distance = dist_m / 1000.0 # Convert to km
                 
@@ -78,8 +84,9 @@ class Scenario():
                     final_string = rx.read_optical_payload(rx_symbols_x, rx_symbols_y)
                     print(f"\nSTRING AT {current_distance} KM: {final_string}")
 
-                if current_distance == time_to_attack:
-                     print("\n--- FIBER TAP ATTACK ---")
+                # if attack occurs while the solitons are on their way to the receiver, bend the fiber now
+                if not pre_bend and current_distance == time_to_attack: 
+                     print("\n--- FIBER TAP ATTACK OCCURRED UPSTREAM ---")
                      attacker.tap_fiber(fiber, bend_radius_mm=config.bend_radius_mm)
 
                      fiber.update_control_profile(control_beam, total_steps, attack_location_km, config.siphon_percentage)
@@ -87,9 +94,10 @@ class Scenario():
                 # Check for attack
                 if current_distance == attack_location_km:
 
-                     # Attacker pulls the light out of the fiber
+                     # Attacker pulls small amount of light out of the fiber
                      stolen_string = attacker.intercept_payload(current_signal)
-                     print(f"ATTACKER Intercepted String: {stolen_string}")
+                     print("\n--- ATTACKER READING STRING ---")
+                     print(f"\nIntercepted String: {stolen_string}")
                      current_signal.apply_siphon_loss(config.siphon_percentage)
 
         else:
@@ -102,9 +110,9 @@ class Scenario():
                     final_string = rx.read_optical_payload(rx_symbols_x, rx_symbols_y)
                     print(f"\nSTRING AT {current_distance} KM: {final_string}")
 
-        # --- PHASE 5: LEGITIMATE RECEIVER READOUT ---
-        print("\n--- PHASE 5: LINK TERMINATION ---")
-        # The surviving, highly entropic light reaches the Rx
+        # 6. The receiver reads whatever is there
+        print("\n--- LINK TERMINATION ---")
+        # The surviving light makes it to the rx
         rx_symbols_x, rx_symbols_y = rx.extract_symbols(current_signal)
         final_string = rx.read_optical_payload(rx_symbols_x, rx_symbols_y)
         
