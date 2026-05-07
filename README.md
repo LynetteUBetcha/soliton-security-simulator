@@ -22,7 +22,7 @@ attack\_enabled: Dictates whether a tap attack occurs during string transmission
 
 pre\_bend: Dictates whether an attacker already had a fiber tap in place.
 
-show\_plts: Setting this to False will suppress plot pop ups throughout program execution.
+show\_plts: Setting this to False will suppress plot pop ups throughout program execution. (Note: if show_plts is enabled, each plot popup will pause the program. To resume, close the plot window.)
 
 save\_plots: Tells the program to save the auto-generated plots or not.
 
