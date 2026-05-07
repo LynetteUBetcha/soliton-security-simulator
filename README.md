@@ -10,10 +10,20 @@ This system would be most useful where the slight overhead of encryption and dec
 
 ## Installation and Run Instructions
 
-To run this code on your device, ensure you create an environment based on the config/environment.yml file. To create an environment based on this file, try running the command "conda env create -f environment.yml" after cloning the repository. After configuring your environment, run main.py. There are three booleans to set here: attack\_enabled, pre\_bend, and save\_plots.
+To run this code on your device, ensure you create an environment based on the config/environment.yml file. This may be simplest from a terminal (such as command prompt).
+
+1. To create an environment based on this file, navigate to the config folder and run the command "conda env create -f environment.yml" after cloning the repository. 
+2. After configuring your environment, activate it with "conda activate soliton-security-sim"
+3. Next, run main.py with the standard "python main.py" command from the main project directory.
+
+If you are so inclined, there are several booleans you can set in main: attack\_enabled, pre\_bend, show\_plts, and save\_plots.
 
 attack\_enabled: Dictates whether a tap attack occurs during string transmission.
+
 pre\_bend: Dictates whether an attacker already had a fiber tap in place.
+
+show\_plts: Setting this to False will suppress plot pop ups throughout program execution.
+
 save\_plots: Tells the program to save the auto-generated plots or not.
 
 ## Roadmap and Future Plans
