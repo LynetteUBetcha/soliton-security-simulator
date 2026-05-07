@@ -13,7 +13,8 @@ class Plotter():
     """
     Generates vizualizations for the simulation
     """
-    def __init__(self, save_plots=False, output_dir="results"):
+    def __init__(self, show_plts=False, save_plots=False, output_dir="results"):
+        self.show_plts = show_plts
         self.save_plots = save_plots
         self.output_dir = output_dir
         
@@ -118,6 +119,6 @@ class Plotter():
             filepath = os.path.join(self.output_dir, f"{filename_base}{formatted_time}.png")
             plt.savefig(filepath)
             print(f"Plot saved to: {filepath}")
-        else:
+        if self.show_plts:
             plt.show()
         plt.close()

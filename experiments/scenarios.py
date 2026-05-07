@@ -11,12 +11,12 @@ class Scenario():
     def __init__(self):
         pass
 
-    def run_scenario(attack_enabled=True, pre_bend=True, save_plots=True):
+    def run_scenario(attack_enabled=True, pre_bend=True, show_plts=False, save_plots=True):
 
         log = Logger()
         log.log_config()
 
-        plotter = Plotter(save_plots)
+        plotter = Plotter(show_plts, save_plots)
 
         print("\n=== INITIALIZING SYMBIOTIC FIBER SIMULATION ===")
 
